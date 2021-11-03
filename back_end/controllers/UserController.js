@@ -59,8 +59,9 @@ module.exports = class UserController{
         })
 
         try {
+
             const newUser = await user.save()
-            
+
             await createUserToken(newUser, req, res)
 
             return
@@ -68,4 +69,56 @@ module.exports = class UserController{
             res.status(500).json({message: error})
         }
     }
+
+    // create - login
+    static async login(req, res){
+    
+        const {email, password} = req.body
+
+        if(!email){
+
+            res.status(422).json({ message: 'O e-mail é obrigatorio' })
+            return
+
+        }
+
+        if(!password){
+
+            res.status(422).json({message: "O e-mail é obrigatório"})
+            return
+
+        }
+
+
+        // exists user
+        const user = await User.findOne({ email: email})
+
+
+        if(!user){
+            res.status(422).json({
+
+                message: 'Por favor faça um cadastro',
+            })
+            return
+        }
+
+        const truePassword = bcrypt.compare(password, user.password)
+
+        if(!truePassword){
+
+            res.status(422).json({ 
+
+                message: "Senha Inválida",
+
+            })
+
+            return
+
+        }
+
+        //
+
+        await createUserToken(user, req, res)
+    }
+
 }
