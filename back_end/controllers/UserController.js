@@ -1,6 +1,7 @@
 const User = require('../models/User')
 const bcrypt = require('bcrypt')
 const createUserToken = require('../helpers/create-token-user')
+const getUserByToken = require('../helpers/get-user-by-token')
 const getToken = require('../helpers/get-token')
 const jwt = require('jsonwebtoken')
 
@@ -87,27 +88,28 @@ module.exports = class UserController{
 
         if(!password){
 
-            res.status(422).json({message: "O e-mail é obrigatório"})
+            res.status(422).json({message: "A senha é obrigatório"})
             return
 
         }
 
-
         // exists user
-        const user = await User.findOne({ email: email})
-
+        const user = await User.findOne({ email: email })
 
         if(!user){
             res.status(422).json({
 
                 message: 'Por favor faça um cadastro',
+
             })
+
             return
+
         }
 
-        const truePassword = bcrypt.compare(password, user.password)
+        const checkPassword = await bcrypt.compare(password, user.password)
 
-        if(!truePassword){
+        if(!checkPassword){
 
             res.status(422).json({ 
 
@@ -170,11 +172,83 @@ module.exports = class UserController{
     }
 
     static async editUser(req, res){
-        res.status(200).json({
-            message: 'Testar Controller',
-         })
 
-        return
+
+        const id = req.params.id
+        const token = getToken(req)
+        const user = await getUserByToken(token) 
+        const { name, email, phone, password, confirmpassword } = req.body
+
+        if(req.file){
+
+            user.image = req.file.filename
+
+        }
+
+        //Validations
+        if (!name) {
+            res.status(422).json({message: 'O nome é obrigatorio'})
+            return
+        }
+
+        user.name = name
+
+        if (!email) {
+            res.status(422).json({message: 'O email é obrigatorio'})
+            return
+        }
+
+        const userExists = await User.findOne({email: email})
+
+        if (user.email !== email && userExists) {
+            res.status(422).json({message: 'E-mail não encontrado'})
+            return
+        }
+
+        user.email = email
+
+        if (!phone) {
+            res.status(422).json({message: 'O telefone é obrigatorio'})
+            return
+        }
+
+        user.phone = phone
+
+        if(password != confirmpassword){
+            res.status(422).json({message: 'As senhas não conferem!'})
+
+            return
+
+        }else if(password === confirmpassword && password != null){
+
+            const salt = await bcrypt.genSalt(12)
+            const passwordHash = await bcrypt.hash(password, salt)
+
+            user.password = passwordHash
+
+        }
+
+        // fim validations
+
+        try{
+
+            await User.findOneAndUpdate(
+                { _id: user._id },
+                { $set: user },
+                { new: true })
+
+            res.status(200).json({
+
+                    message: "Salvo"
+
+                })
+
+        }catch(err){
+
+            res.status(500).json({message: err})
+            return
+
+        }
 
     }
 
